@@ -8,29 +8,45 @@ from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import DuplicateValueException, ForbiddenException, NotFoundException
 from ...core.security import blacklist_token, get_password_hash, oauth2_scheme
-from ...crud.crud_rate_limit import crud_rate_limits
-from ...crud.crud_tier import crud_tiers
 from ...crud.crud_users import crud_users
 from ...models.tier import Tier
 from ...schemas.tier import TierRead
-from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserTierUpdate, UserUpdate
+from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserUpdate
+from ...service.external.s3_bucket import S3Utils
+from ...service.utils.qr_code import generate_qr_code
+
 
 router = APIRouter(tags=["users"])
 
 
 @router.post("/user", response_model=UserRead, status_code=201)
 async def write_user(
-    request: Request, user: UserCreate, db: Annotated[AsyncSession, Depends(async_get_db)]
+    request: Request, db: Annotated[AsyncSession, Depends(async_get_db)]
 ) -> UserRead:
-    email_row = await crud_users.exists(db=db, email=user.email)
+    
+    user_internal_dict = {}
+    form_data = await request.form()
+    image = form_data.get('image')
+    user_internal_dict['name'] = form_data.get('name')
+    user_internal_dict['username'] = form_data.get('username')
+    user_internal_dict['email'] = form_data.get('email')
+    user_internal_dict['password'] = form_data.get('password')
+    
+    email_row = await crud_users.exists(db=db, email=user_internal_dict['email'])
     if email_row:
         raise DuplicateValueException("Email is already registered")
 
-    username_row = await crud_users.exists(db=db, username=user.username)
+    username_row = await crud_users.exists(db=db, username=user_internal_dict['username'])
     if username_row:
         raise DuplicateValueException("Username not available")
-
-    user_internal_dict = user.model_dump()
+    s3_object = S3Utils() 
+    if image:
+        image_url = s3_object.upload_image_to_s3(name=user_internal_dict['name'], file=image)
+        # qr_code = generate_qr_code(url="http://localhost:4200")
+        # with open(qr_code, 'rb') as f:
+        #     qr_code_url = s3_object.upload_image_to_s3(name=f"qr-{user_internal_dict['name']}", file=f) 
+        #     user_internal_dict["qr_code"] = qr_code_url 
+        user_internal_dict["image_url"] = image_url    
     user_internal_dict["hashed_password"] = get_password_hash(password=user_internal_dict["password"])
     del user_internal_dict["password"]
 
@@ -70,57 +86,69 @@ async def read_user(request: Request, username: str, db: Annotated[AsyncSession,
 
     return db_user
 
-
-@router.patch("/user/{username}")
-async def patch_user(
-    request: Request,
-    values: UserUpdate,
-    username: str,
+@router.patch("/user", response_model=UserRead)
+async def update_user(
+    # user_id: int, 
+    request: Request, 
     current_user: Annotated[UserRead, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(async_get_db)],
-) -> dict[str, str]:
-    db_user = await crud_users.get(db=db, schema_to_select=UserRead, username=username)
-    if db_user is None:
+    db: Annotated[AsyncSession, Depends(async_get_db)]
+) -> UserRead | None:
+    print(current_user)
+    user_update_dict = {}
+    form_data = await request.form()
+    image = form_data.get('image')
+    user_update_dict['name'] = form_data.get('name')
+    user_update_dict['username'] = form_data.get('username')
+    user_update_dict['email'] = form_data.get('email')
+    # user_update_dict['password'] = form_data.get('password')
+
+    # current_user = await crud_users.get(db=db, id=user_id)
+    if not current_user:
         raise NotFoundException("User not found")
 
-    if db_user["username"] != current_user["username"]:
-        raise ForbiddenException()
-
-    if values.username != db_user["username"]:
-        existing_username = await crud_users.exists(db=db, username=values.username)
-        if existing_username:
-            raise DuplicateValueException("Username not available")
-
-    if values.email != db_user["email"]:
-        existing_email = await crud_users.exists(db=db, email=values.email)
-        if existing_email:
+    if user_update_dict.get('email') and user_update_dict['email'] != current_user["email"]:
+        email_row = await crud_users.exists(db=db, email=user_update_dict['email'])
+        if email_row:
             raise DuplicateValueException("Email is already registered")
 
-    await crud_users.update(db=db, object=values, username=username)
-    return {"message": "User updated"}
+    if user_update_dict.get('username') and user_update_dict['username'] != current_user["username"]:
+        username_row = await crud_users.exists(db=db, username=user_update_dict['username'])
+        if username_row:
+            raise DuplicateValueException("Username not available")
 
+    s3_object = S3Utils()
+    if image:
+        image_url = s3_object.upload_image_to_s3(name=user_update_dict['name'], file=image)
+        print(image_url , image)
+        user_update_dict["image_url"] = image_url
+        s3_object.delete_image_from_s3(file_url=current_user["image_url"])
 
-@router.delete("/user/{username}")
+    # if user_update_dict.get('password'):
+    #     user_update_dict["hashed_password"] = get_password_hash(password=user_update_dict["password"])
+    #     del user_update_dict["password"]
+    user_update_dict = {k: v for k, v in user_update_dict.items() if v is not None}
+    await crud_users.update(db=db, object=user_update_dict, id=current_user["id"])
+    updated_user = await crud_users.get(db=db, id=current_user["id"])
+    return updated_user
+
+@router.delete("/user")
 async def erase_user(
     request: Request,
-    username: str,
     current_user: Annotated[UserRead, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
     token: str = Depends(oauth2_scheme),
 ) -> dict[str, str]:
-    db_user = await crud_users.get(db=db, schema_to_select=UserRead, username=username)
+    db_user = await crud_users.get(db=db, schema_to_select=UserRead, id=current_user["id"])
     if not db_user:
         raise NotFoundException("User not found")
 
-    if username != current_user["username"]:
-        raise ForbiddenException()
 
-    await crud_users.delete(db=db, username=username)
+    await crud_users.delete(db=db, id=current_user["id"])
     await blacklist_token(token=token, db=db)
     return {"message": "User deleted"}
 
 
-@router.delete("/db_user/{username}", dependencies=[Depends(get_current_superuser)])
+@router.delete("/db_user", dependencies=[Depends(get_current_superuser)])
 async def erase_db_user(
     request: Request,
     username: str,
@@ -135,65 +163,3 @@ async def erase_db_user(
     await blacklist_token(token=token, db=db)
     return {"message": "User deleted from the database"}
 
-
-@router.get("/user/{username}/rate_limits", dependencies=[Depends(get_current_superuser)])
-async def read_user_rate_limits(
-    request: Request, username: str, db: Annotated[AsyncSession, Depends(async_get_db)]
-) -> dict[str, Any]:
-    db_user: dict | None = await crud_users.get(db=db, username=username, schema_to_select=UserRead)
-    if db_user is None:
-        raise NotFoundException("User not found")
-
-    if db_user["tier_id"] is None:
-        db_user["tier_rate_limits"] = []
-        return db_user
-
-    db_tier = await crud_tiers.get(db=db, id=db_user["tier_id"])
-    if db_tier is None:
-        raise NotFoundException("Tier not found")
-
-    db_rate_limits = await crud_rate_limits.get_multi(db=db, tier_id=db_tier["id"])
-
-    db_user["tier_rate_limits"] = db_rate_limits["data"]
-
-    return db_user
-
-
-@router.get("/user/{username}/tier")
-async def read_user_tier(
-    request: Request, username: str, db: Annotated[AsyncSession, Depends(async_get_db)]
-) -> dict | None:
-    db_user = await crud_users.get(db=db, username=username, schema_to_select=UserRead)
-    if db_user is None:
-        raise NotFoundException("User not found")
-
-    db_tier = await crud_tiers.exists(db=db, id=db_user["tier_id"])
-    if not db_tier:
-        raise NotFoundException("Tier not found")
-
-    joined: dict = await crud_users.get_joined(
-        db=db,
-        join_model=Tier,
-        join_prefix="tier_",
-        schema_to_select=UserRead,
-        join_schema_to_select=TierRead,
-        username=username,
-    )
-
-    return joined
-
-
-@router.patch("/user/{username}/tier", dependencies=[Depends(get_current_superuser)])
-async def patch_user_tier(
-    request: Request, username: str, values: UserTierUpdate, db: Annotated[AsyncSession, Depends(async_get_db)]
-) -> dict[str, str]:
-    db_user = await crud_users.get(db=db, username=username, schema_to_select=UserRead)
-    if db_user is None:
-        raise NotFoundException("User not found")
-
-    db_tier = await crud_tiers.get(db=db, id=values.tier_id)
-    if db_tier is None:
-        raise NotFoundException("Tier not found")
-
-    await crud_users.update(db=db, object=values, username=username)
-    return {"message": f"User {db_user['name']} Tier updated"}
