@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
 from fastcrud.paginated import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import DuplicateValueException, ForbiddenException, NotFoundException
 from ...core.security import blacklist_token, get_password_hash, oauth2_scheme
+from ...core.schemas import ResponseSchema
 from ...crud.crud_users import crud_users
 from ...models.tier import Tier
 from ...schemas.tier import TierRead
@@ -19,10 +20,10 @@ from ...service.utils.qr_code import generate_qr_code
 router = APIRouter(tags=["users"])
 
 
-@router.post("/user", response_model=UserRead, status_code=201)
+@router.post("/user", response_model=ResponseSchema, status_code=201)
 async def write_user(
     request: Request, db: Annotated[AsyncSession, Depends(async_get_db)]
-) -> UserRead:
+) -> ResponseSchema:
     
     user_internal_dict = {}
     form_data = await request.form()
@@ -52,7 +53,12 @@ async def write_user(
 
     user_internal = UserCreateInternal(**user_internal_dict)
     created_user: UserRead = await crud_users.create(db=db, object=user_internal)
-    return created_user
+    return ResponseSchema(
+        status_code=status.HTTP_201_CREATED,
+        message="user created",
+        data=created_user
+        
+    )
 
 
 @router.get("/users", response_model=PaginatedListResponse[UserRead])
@@ -119,7 +125,6 @@ async def update_user(
     s3_object = S3Utils()
     if image:
         image_url = s3_object.upload_image_to_s3(name=user_update_dict['name'], file=image)
-        print(image_url , image)
         user_update_dict["image_url"] = image_url
         s3_object.delete_image_from_s3(file_url=current_user["image_url"])
 
