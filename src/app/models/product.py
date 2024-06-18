@@ -12,6 +12,7 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column("id", autoincrement=True, nullable=False, unique=True, primary_key=True, init=False)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), index=True)
     name: Mapped[str] = mapped_column(String(30))
     description: Mapped[str] = mapped_column(String(63206))
     image: Mapped[str | None] = mapped_column(String, default=None)

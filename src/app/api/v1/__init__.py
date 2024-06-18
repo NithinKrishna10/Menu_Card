@@ -7,11 +7,14 @@ from .rate_limits import router as rate_limits_router
 from .tasks import router as tasks_router
 from .tiers import router as tiers_router
 from .users import router as users_router
+from .category import router as category_router
+from .product import router as product_router
 
 router = APIRouter(prefix="/v1")
 router.include_router(login_router)
 router.include_router(logout_router)
 router.include_router(users_router)
+router.include_router(category_router)
 # router.include_router(posts_router)
 # router.include_router(tasks_router)
 # router.include_router(tiers_router)

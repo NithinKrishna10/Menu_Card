@@ -70,8 +70,8 @@ class TokenBlacklistUpdate(TokenBlacklistBase):
     pass
 
 
-class Response(BaseModel):
+class ResponseSchema(BaseModel):
     status_code: int | None = Field(default=200)
     message: str | None
-    data: list | None
-    row_count: int | None
+    data: Any
+    # row_count: int | None

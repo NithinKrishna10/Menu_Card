@@ -24,8 +24,8 @@ class UserRead(BaseModel):
     name: Annotated[str, Field(min_length=2, max_length=30, examples=["User Userson"])]
     username: Annotated[str, Field(min_length=2, max_length=20, pattern=r"^[a-z0-9]+$", examples=["userson"])]
     email: Annotated[EmailStr, Field(examples=["user.userson@example.com"])]
-    image_url: str
-    qr_code : str
+    image_url: Annotated[str, Field(default="https://www.profileimageurl.com")]
+    qr_code :  Annotated[str, Field(default="https://www.profileimageurl.com")]
 
 
 class UserCreate(UserBase):
@@ -36,9 +36,8 @@ class UserCreate(UserBase):
 
 class UserCreateInternal(UserBase):
     hashed_password: str
-    image_url: str
-    qr_code : str
-
+    image_url: Annotated[str, Field(default="https://www.profileimageurl.com")]
+    qr_code :  Annotated[str, Field(default="https://www.profileimageurl.com")]
 
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")

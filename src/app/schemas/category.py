@@ -17,6 +17,7 @@ class Category(TimestampSchema, CategoryBase, PersistentDeletion):
     
     
 class CategoryRead(BaseModel):
+    id : int 
     name: Annotated[str, Field(min_length=2, max_length=30, examples=["This is my post"])]
     description: Annotated[str, Field(min_length=1, max_length=63206, examples=["This is the content of my post."])]
     image: Annotated[str, Field(min_length=1, max_length=100000, examples=["This is the content of my post."])]
