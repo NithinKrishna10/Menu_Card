@@ -98,6 +98,13 @@ class DefaultRateLimitSettings(BaseSettings):
     DEFAULT_RATE_LIMIT_LIMIT: int = config("DEFAULT_RATE_LIMIT_LIMIT", default=10)
     DEFAULT_RATE_LIMIT_PERIOD: int = config("DEFAULT_RATE_LIMIT_PERIOD", default=3600)
 
+class S3BUCKET(BaseSettings):
+    S3_BUCKET: str = config("S3_BUCKET")
+    S3_BUCKET_ACCESS_KEY: str = config("S3_BUCKET_ACCESS_KEY")
+    S3_BUCKET_SECRET_KEY: str = config("S3_BUCKET_SECRET_KEY")
+    S3_BUCKET_REGION: str = config("S3_BUCKET_REGION")
+    
+
 
 class EnvironmentOption(Enum):
     LOCAL = "local"
@@ -121,6 +128,7 @@ class Settings(
     RedisRateLimiterSettings,
     DefaultRateLimitSettings,
     EnvironmentSettings,
+    S3BUCKET,
 ):
     pass
 

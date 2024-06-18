@@ -68,3 +68,10 @@ class TokenBlacklistCreate(TokenBlacklistBase):
 
 class TokenBlacklistUpdate(TokenBlacklistBase):
     pass
+
+
+class Response(BaseModel):
+    status_code: int | None = Field(default=200)
+    message: str | None
+    data: list | None
+    row_count: int | None
