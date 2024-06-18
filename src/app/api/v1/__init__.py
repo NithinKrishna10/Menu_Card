@@ -11,7 +11,7 @@ from .users import router as users_router
 router = APIRouter(prefix="/v1")
 router.include_router(login_router)
 router.include_router(logout_router)
-# router.include_router(users_router)
+router.include_router(users_router)
 # router.include_router(posts_router)
 # router.include_router(tasks_router)
 # router.include_router(tiers_router)
