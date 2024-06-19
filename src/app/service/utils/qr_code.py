@@ -16,7 +16,7 @@ def generate_qr_code(url):
     buffer = BytesIO()
     img.save(buffer,"PNG")
     buffer.seek(0)
-    img.save("filename.png")    
+    img.save("qr_url.png")    
     return "filename.png"
    
-generate_qr_code("ht")
+generate_qr_code("http://localhost:4200/")
