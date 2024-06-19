@@ -8,6 +8,7 @@ from ..core.schemas import PersistentDeletion, TimestampSchema, UUIDSchema
 class ProductBase(BaseModel):
     name: Annotated[str, Field(min_length=2, max_length=30, examples=["This is my product name"])]
     description: Annotated[str, Field(min_length=1, max_length=63206, examples=["This is the product description"])]
+    price : int
 
 class Product(TimestampSchema, ProductBase, PersistentDeletion):
     image: Optional[Annotated[str, Field(min_length=1, max_length=100000, examples=["This is the product image content."])]]
@@ -19,7 +20,7 @@ class ProductRead(BaseModel):
     image: Optional[Annotated[str, Field(min_length=1, max_length=100000, examples=["This is the product image content."])]]
     created_by_user_id: int
     created_at: datetime
-
+    price : int
 class ProductCreate(ProductBase):
     model_config = ConfigDict(extra="forbid")
 
@@ -27,7 +28,10 @@ class ProductCreate(ProductBase):
 
 class ProductCreateInternal(ProductCreate):
     created_by_user_id: int
-
+    image : str | None = None
+    category_id : int
+    description : str | None = None
+    
 class ProductUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -33,6 +33,8 @@ class CategoryCreate(CategoryBase):
 
 class CategoryCreateInternal(CategoryCreate):
     created_by_user_id: int
+    description : str | None
+    image : str | None = None
 
 
 class CategoryUpdate(BaseModel):

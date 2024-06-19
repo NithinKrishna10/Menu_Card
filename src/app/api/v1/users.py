@@ -43,10 +43,8 @@ async def write_user(
     s3_object = S3Utils() 
     if image:
         image_url = s3_object.upload_image_to_s3(name=user_internal_dict['name'], file=image)
-        # qr_code = generate_qr_code(url="http://localhost:4200")
-        # with open(qr_code, 'rb') as f:
-        #     qr_code_url = s3_object.upload_image_to_s3(name=f"qr-{user_internal_dict['name']}", file=f) 
-        #     user_internal_dict["qr_code"] = qr_code_url 
+ 
+        user_internal_dict["qr_code"] = "https://menu-card.s3.ap-south-1.amazonaws.com/menu-card/qr_url.png"
         user_internal_dict["image_url"] = image_url    
     user_internal_dict["hashed_password"] = get_password_hash(password=user_internal_dict["password"])
     del user_internal_dict["password"]
@@ -82,7 +80,7 @@ async def read_users_me(request: Request, current_user: Annotated[UserRead, Depe
     return current_user
 
 
-@router.get("/user/{username}", response_model=UserRead)
+@router.get("/user/{username}/", response_model=UserRead)
 async def read_user(request: Request, username: str, db: Annotated[AsyncSession, Depends(async_get_db)]) -> dict:
     db_user: UserRead | None = await crud_users.get(
         db=db, schema_to_select=UserRead, username=username, is_deleted=False
