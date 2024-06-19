@@ -40,12 +40,12 @@ async def get_categories(
         data=category["data"]
     )
 
-@router.get("/category/{category_id}", response_model=CategoryRead)
+@router.get("/category/{category_id}", response_model=ResponseSchema)
 async def get_category(
     category_id: int,
     current_user: Annotated[UserRead, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
-) -> CategoryRead:
+) -> ResponseSchema:
     
     if current_user is None:
         raise NotFoundException("User not found")
@@ -54,7 +54,12 @@ async def get_category(
     if not category:
         raise NotFoundException("Category not found")
 
-    return category
+    return ResponseSchema(
+        status_code= status.HTTP_200_OK,
+        message="Category successfully fetched",
+        data=category
+    )
+
 
 
 @router.post("/category", response_model=ResponseSchema, status_code=201)
@@ -64,8 +69,8 @@ async def write_category(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> ResponseSchema:
     
-    if current_user is None:
-        raise NotFoundException("User not found")
+    # if current_user is None:
+    #     raise NotFoundException("User not found")
 
     category_internal_dict = {}
     form_data = await request.form()
@@ -77,9 +82,10 @@ async def write_category(
     s3_object = S3Utils()
     if image:
         image_url = s3_object.upload_image_to_s3(name=category_internal_dict['name'], file=image)
-        category_internal_dict["image_url"] = image_url
+        category_internal_dict["image"] = image_url
     category_internal = CategoryCreateInternal(**category_internal_dict)
-    created_category: CategoryRead = await crud_posts.create(db=db, object=category_internal)
+    print(category_internal)
+    created_category: CategoryRead = await crud_category.create(db=db, object=category_internal)
     
     return ResponseSchema(
         status_code= status.HTTP_201_CREATED,
@@ -87,13 +93,13 @@ async def write_category(
         data=created_category
     )
 
-@router.patch("/category/{category_id}", response_model=CategoryRead)
+@router.patch("/category/{category_id}", response_model=ResponseSchema)
 async def update_category(
     category_id: int,
     request: Request,
     current_user: Annotated[UserRead, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
-) -> CategoryRead:
+) -> ResponseSchema:
 
     if current_user is None:
         raise NotFoundException("User not found")
@@ -117,6 +123,15 @@ async def update_category(
         category_update_dict["image_url"] = image_url
         s3_object.delete_image_from_s3(file_url=category["image_url"])
 
-    updated_category = await crud_category.update(db=db, object=category_update_dict, id=category["id"])
-    return updated_category
+    await crud_category.update(db=db, object=category_update_dict, id=category["id"])
+    updated_category = await crud_category.update(db=db, id=category["id"])
+  
+    return ResponseSchema(
+        status_code= status.HTTP_200_OK,
+        message="Category successfully updated",
+        data=updated_category
+    )
+  
+
+  
 
