@@ -132,6 +132,23 @@ async def update_category(
         data=updated_category
     )
   
+@router.delete("/category/{category_id}", response_model=ResponseSchema)
+async def delete_category(
+    category_id: int,
+    current_user: Annotated[UserRead, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ResponseSchema:
 
-  
+    if current_user is None:
+        raise NotFoundException("User not found")
 
+    category = await crud_category.get(db=db, id=category_id)
+    if not category:
+        raise NotFoundException("Category not found")
+
+    await crud_category.db_delete(db=db, id=category_id)
+    return ResponseSchema(
+    status_code= status.HTTP_204_NO_CONTENT,
+    message="Category successfully deleted",
+    data={}
+)

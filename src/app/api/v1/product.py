@@ -34,7 +34,6 @@ async def get_product(
     product = await crud_product.get_multi(db=db, created_by_user_id=current_user["id"])
     if not product:
         raise NotFoundException("Product not found")
-
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
         message="Product successfully fetched",
@@ -55,7 +54,6 @@ async def get_product(
     product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id)
     if not product:
         raise NotFoundException("Product not found")
-
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
         message="Product successfully fetched",
@@ -77,10 +75,9 @@ async def write_product(
     print(form_data)
     image = form_data.get('image')
     product_internal_dict['name'] = form_data.get('name')
+    product_internal_dict['stock_available'] = form_data.get('stock_available')
     product_internal_dict['price'] = form_data.get('price')
-    print("product_internal_dict :",product_internal_dict)
     category_id = int(form_data.get('category_id'))
-    print("category_id"  , category_id, type(category_id))
     category = await crud_category.get(db=db, id=category_id, created_by_user_id=current_user["id"])
     if category is None:
         raise NotFoundException("Category not found")
@@ -111,33 +108,38 @@ async def update_product(
 
     if current_user is None:
         raise NotFoundException("User not found")
+    product = await crud_product.get(db=db, id=product_id)
+    if not product:
+        raise NotFoundException("Product not found")
 
     product_update_dict = {}
     form_data = await request.form()
     image = form_data.get('image')
     product_update_dict['name'] = form_data.get('name')
+    product_update_dict['price'] = form_data.get('price')
+    product_update_dict['stock_available'] = form_data.get('stock_available')
     product_update_dict['description'] = form_data.get('description')
     category_id = form_data.get('category_id')
-    category = await crud_category.get(db=db, id=category_id, created_by_user_id=current_user["id"])
-    if category is None:
-        raise NotFoundException("Category not found")
+    if category_id:
+        category = await crud_category.get(db=db, id=int(category_id), created_by_user_id=current_user["id"])
+        if category is None:
+            raise NotFoundException("Category not found")
 
-    product_update_dict['category_id'] = category_id
-    # Filter out keys with None values
-    product_update_dict = {k: v for k,v in product_update_dict.items() if v is not None}
 
-    product = await crud_product.get(db=db, id=product_id)
-    if not product:
-        raise NotFoundException("Product not found")
 
     s3_object = S3Utils()
     if image:
         image_url = s3_object.upload_image_to_s3(
             name=product_update_dict['name'], file=image)
-        product_update_dict["image_url"] = image_url
-
-    await crud_product.update(db=db, object=product_update_dict, id=category_id)
-    updated_product = await crud_product.get(db=db, id=category_id)
+        product_update_dict["image"] = image_url
+        s3_object.delete_image_from_s3(file_url=product["image"])
+    product_update_dict['category_id'] = category_id
+    product_obj = ProductUpdateInternal(**product_update_dict)
+    product_update_dict = product_obj.model_dump(exclude_unset=True)
+    # Filter out keys with None values
+    product_update_dict = {k: v for k,v in product_update_dict.items() if v is not None}
+    await crud_product.update(db=db, object=product_update_dict, id=product_id)
+    updated_product = await crud_product.get(db=db, id=product_id)
     
     
     return ResponseSchema(
@@ -146,3 +148,24 @@ async def update_product(
         data=updated_product
     )
 
+@router.delete("/product/{product_id}", response_model=ResponseSchema)
+async def delete_product(
+    product_id: int,
+    current_user: Annotated[UserRead, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ResponseSchema:
+
+    if current_user is None:
+        raise NotFoundException("User not found")
+
+    product = await crud_product.get(db=db, id=product_id)
+    if not product:
+        raise NotFoundException("Product not found")
+
+    await crud_product.db_delete(db=db, id=product_id)
+    
+    return ResponseSchema(
+    status_code= status.HTTP_204_NO_CONTENT,
+    message="Product successfully deleted",
+    data={}
+)
