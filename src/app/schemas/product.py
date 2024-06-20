@@ -31,7 +31,7 @@ class ProductCreateInternal(ProductCreate):
     image : str | None = None
     category_id : int
     description : str | None = None
-    
+    stock_available : bool = True
 class ProductUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -44,8 +44,14 @@ class ProductUpdate(BaseModel):
     ]
     image: Optional[Annotated[str, Field(min_length=1, max_length=100000, examples=["This is the updated product image content."])]] = None
 
-class ProductUpdateInternal(ProductUpdate):
-    updated_at: datetime
+class ProductUpdateInternal(BaseModel):
+    image : str | None = None
+    category_id : int | None = None
+    description : str | None = None
+    name : str |  None = None
+    price : int | None = None
+    stock_available : bool | None = None
+
 
 class ProductDelete(BaseModel):
     model_config = ConfigDict(extra="forbid")
