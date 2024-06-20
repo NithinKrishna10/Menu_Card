@@ -72,6 +72,7 @@ async def write_product(
 
     product_internal_dict = {}
     form_data = await request.form()
+    print(form_data)
     image = form_data.get('image')
     product_internal_dict['name'] = form_data.get('name')
     product_internal_dict['stock_available'] = form_data.get('stock_available')
