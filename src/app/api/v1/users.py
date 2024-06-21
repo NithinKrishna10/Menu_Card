@@ -6,13 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
-from ...core.exceptions.http_exceptions import DuplicateValueException, ForbiddenException, NotFoundException
+from ...core.exceptions.http_exceptions import DuplicateValueException, NotFoundException
 from ...core.security import blacklist_token, get_password_hash, oauth2_scheme
 from ...core.schemas import ResponseSchema
 from ...crud.crud_users import crud_users
-from ...models.tier import Tier
-from ...schemas.tier import TierRead
-from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserUpdate
+from ...schemas.user import UserCreate, UserCreateInternal, UserRead
 from ...service.external.s3_bucket import S3Utils
 from ...service.utils.qr_code import generate_qr_code
 
@@ -41,10 +39,11 @@ async def write_user(
     if username_row:
         raise DuplicateValueException("Username not available")
     s3_object = S3Utils() 
+
+    user_internal_dict["qr_code"] = generate_qr_code(url="http://localhost:4200/")
     if image:
         image_url = s3_object.upload_image_to_s3(name=user_internal_dict['name'], file=image)
  
-        user_internal_dict["qr_code"] = "https://menu-card.s3.ap-south-1.amazonaws.com/menu-card/qr_url.png"
         user_internal_dict["image_url"] = image_url    
     user_internal_dict["hashed_password"] = get_password_hash(password=user_internal_dict["password"])
     del user_internal_dict["password"]

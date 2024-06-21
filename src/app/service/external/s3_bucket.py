@@ -36,6 +36,29 @@ class S3Utils:
                     return url
             except FileNotFoundError:
                     logger.error(f"The file '{file}' was not found.")
+                    
+    def upload_qr_image_to_s3(self, name: str, file):
+            """Upload the image to S3."""
+            logger.info(f'Uploading file {file} to S3 Bucket')
+            s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=s3_bucket_access_key,
+                    aws_secret_access_key=s3_bucket_secret_key,
+                    region_name=region,
+            )
+            obj_name = f'menu-card/qr-{name}'.replace(' ', '-')
+            try:
+                
+                #     s3.upload_fileobj(file.file, BUCKET, obj_name, ExtraArgs={'ACL': 'public-read'})
+                    s3.upload_fileobj(file,BUCKET, obj_name, ExtraArgs={'ACL': 'public-read', 'ContentType': 'image/png', 'ContentDisposition': 'attachment'})
+
+                    logger.info(
+                            f"File '{file}' uploaded to 'https://{BUCKET}.s3.amazonaws.com/{obj_name}' successfully."
+                    )
+                    url = f'https://{BUCKET}.s3.amazonaws.com/{obj_name}'
+                    return url
+            except FileNotFoundError:
+                    logger.error(f"The file '{file}' was not found.")
 
     def delete_image_from_s3(self, file_url):
             """Delete the attachment file from S3"""
