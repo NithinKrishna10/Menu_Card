@@ -81,7 +81,7 @@ async def write_category(
 
     s3_object = S3Utils()
     if image:
-        image_url = s3_object.upload_image_to_s3(name=f"{current_user["uuid"]}-{category_internal_dict['name']}", file=image)
+        image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}-{category_internal_dict['name']}", file=image)
         category_internal_dict["image"] = image_url
     category_internal = CategoryCreateInternal(**category_internal_dict)
     created_category: CategoryRead = await crud_category.create(db=db, object=category_internal)
