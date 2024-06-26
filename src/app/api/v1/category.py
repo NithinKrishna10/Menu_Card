@@ -81,10 +81,9 @@ async def write_category(
 
     s3_object = S3Utils()
     if image:
-        image_url = s3_object.upload_image_to_s3(name=category_internal_dict['name'], file=image)
+        image_url = s3_object.upload_image_to_s3(name=f"{current_user["uuid"]}-{category_internal_dict['name']}", file=image)
         category_internal_dict["image"] = image_url
     category_internal = CategoryCreateInternal(**category_internal_dict)
-    print(category_internal)
     created_category: CategoryRead = await crud_category.create(db=db, object=category_internal)
     
     return ResponseSchema(
@@ -103,7 +102,9 @@ async def update_category(
 
     if current_user is None:
         raise NotFoundException("User not found")
-
+    category = await crud_category.get(db=db, id=category_id)
+    if not category:
+        raise NotFoundException("Category not found")
     category_update_dict = {}
     form_data = await request.form()
     image = form_data.get('image')
@@ -113,18 +114,15 @@ async def update_category(
     # Filter out keys with None values
     category_update_dict = {k: v for k, v in category_update_dict.items() if v is not None}
 
-    category = await crud_category.get(db=db, id=category_id)
-    if not category:
-        raise NotFoundException("Category not found")
 
     s3_object = S3Utils()
     if image:
-        image_url = s3_object.upload_image_to_s3(name=category_update_dict['name'], file=image)
+        image_url = s3_object.upload_image_to_s3(name=f"{current_user["uuid"]}{category['name']}", file=image)
         category_update_dict["image_url"] = image_url
         s3_object.delete_image_from_s3(file_url=category["image_url"])
 
     await crud_category.update(db=db, object=category_update_dict, id=category["id"])
-    updated_category = await crud_category.update(db=db, id=category["id"])
+    updated_category = await crud_category.get(db=db, id=category["id"])
   
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
