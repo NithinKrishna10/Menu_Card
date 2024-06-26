@@ -22,4 +22,4 @@ def generate_qr_code(url: str) -> BytesIO:
     buffer.seek(0)
     s3_object = S3Utils() 
 
-    return s3_object.upload_image_to_s3(name="qr-code", file=buffer)
+    return s3_object.upload_qr_image_to_s3(name="qr-code", file=buffer)

@@ -46,7 +46,7 @@ class S3Utils:
                     aws_secret_access_key=s3_bucket_secret_key,
                     region_name=region,
             )
-            obj_name = f'menu-card/qr-{name}'.replace(' ', '-')
+            obj_name = f'menu-card/qr-{name}.png'.replace(' ', '-')
             try:
                 
                 #     s3.upload_fileobj(file.file, BUCKET, obj_name, ExtraArgs={'ACL': 'public-read'})

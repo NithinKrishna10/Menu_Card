@@ -10,6 +10,8 @@ class UserBase(BaseModel):
     name: Annotated[str, Field(min_length=2, max_length=30, examples=["User Userson"])]
     username: Annotated[str, Field(min_length=2, max_length=20, pattern=r"^[a-z0-9]+$", examples=["userson"])]
     email: Annotated[EmailStr, Field(examples=["user.userson@example.com"])]
+    phone : str | None = None
+    location : str | None = None
 
 
 class User(TimestampSchema, UserBase, UUIDSchema, PersistentDeletion):
@@ -26,6 +28,9 @@ class UserRead(BaseModel):
     email: Annotated[EmailStr, Field(examples=["user.userson@example.com"])]
     image_url: Annotated[str, Field(default="https://www.profileimageurl.com")]
     qr_code :  Annotated[str, Field(default="https://www.profileimageurl.com")]
+    phone : str | None
+    location : str | None
+    uuid : str | None
 
 
 class UserCreate(UserBase):
