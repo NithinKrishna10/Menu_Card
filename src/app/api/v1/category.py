@@ -117,7 +117,7 @@ async def update_category(
 
     s3_object = S3Utils()
     if image:
-        image_url = s3_object.upload_image_to_s3(name=f"{current_user["uuid"]}{category['name']}", file=image)
+        image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}{category['name']}", file=image)
         category_update_dict["image_url"] = image_url
         s3_object.delete_image_from_s3(file_url=category["image_url"])
 
