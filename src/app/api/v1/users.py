@@ -6,13 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
-from ...core.exceptions.http_exceptions import DuplicateValueException, ForbiddenException, NotFoundException
+from ...core.exceptions.http_exceptions import DuplicateValueException, NotFoundException
 from ...core.security import blacklist_token, get_password_hash, oauth2_scheme
 from ...core.schemas import ResponseSchema
 from ...crud.crud_users import crud_users
-from ...models.tier import Tier
-from ...schemas.tier import TierRead
-from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserUpdate
+from ...crud.crud_category import crud_category
+from ...crud.crud_products import crud_product
+from ...schemas.user import UserCreate, UserCreateInternal, UserRead
 from ...service.external.s3_bucket import S3Utils
 from ...service.utils.qr_code import generate_qr_code
 
@@ -32,6 +32,8 @@ async def write_user(
     user_internal_dict['username'] = form_data.get('username')
     user_internal_dict['email'] = form_data.get('email')
     user_internal_dict['password'] = form_data.get('password')
+    user_internal_dict['phone'] = form_data.get('phone')
+    user_internal_dict['location'] = form_data.get('location')
     
     email_row = await crud_users.exists(db=db, email=user_internal_dict['email'])
     if email_row:
@@ -41,16 +43,19 @@ async def write_user(
     if username_row:
         raise DuplicateValueException("Username not available")
     s3_object = S3Utils() 
+
     if image:
         image_url = s3_object.upload_image_to_s3(name=user_internal_dict['name'], file=image)
  
-        user_internal_dict["qr_code"] = "https://menu-card.s3.ap-south-1.amazonaws.com/menu-card/qr_url.png"
         user_internal_dict["image_url"] = image_url    
     user_internal_dict["hashed_password"] = get_password_hash(password=user_internal_dict["password"])
     del user_internal_dict["password"]
 
     user_internal = UserCreateInternal(**user_internal_dict)
     created_user: UserRead = await crud_users.create(db=db, object=user_internal)
+    qr_code = generate_qr_code(url=f"https://menucard.site/users/index/{created_user.uuid}")
+    await crud_users.update(db=db,object={'qr_code' : qr_code}, id = created_user.id)
+    created_user.qr_code = qr_code
     return ResponseSchema(
         status_code=status.HTTP_201_CREATED,
         message="user created",
@@ -75,9 +80,19 @@ async def read_users(
     return response
 
 
-@router.get("/user/me/", response_model=UserRead)
-async def read_users_me(request: Request, current_user: Annotated[UserRead, Depends(get_current_user)]) -> UserRead:
-    return current_user
+@router.get("/user/me/", response_model=ResponseSchema)
+async def read_users_me(request: Request, db: Annotated[AsyncSession, Depends(async_get_db)], current_user: Annotated[UserRead, Depends(get_current_user)]) -> ResponseSchema:
+    total_cat = await crud_category.count(db=db,created_by_user_id=current_user["id"])
+    total_prod = await crud_product.count(db=db,created_by_user_id=current_user["id"])
+    # current_user = current_user.model_dumps()
+    current_user["total_product"] = total_prod
+    current_user["total_category"] = total_cat
+    
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="User fetched successfully",
+        data=current_user
+    )
 
 
 @router.get("/user/{username}/", response_model=UserRead)
