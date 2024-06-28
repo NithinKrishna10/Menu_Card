@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Any
 from pydantic import BaseModel, Field, ConfigDict
 
 # Assuming PersistentDeletion, TimestampSchema, UUIDSchema are imported and defined similarly
@@ -13,14 +13,20 @@ class ProductBase(BaseModel):
 class Product(TimestampSchema, ProductBase, PersistentDeletion):
     image: Optional[Annotated[str, Field(min_length=1, max_length=100000, examples=["This is the product image content."])]]
     created_by_user_id: int
-
+class x(BaseModel):
+    name: str
+    price: int
+    stock_available: bool
 class ProductRead(BaseModel):
+    id : int
     name: Annotated[str, Field(min_length=2, max_length=30, examples=["This is my product name"])]
     description: Annotated[str, Field(min_length=1, max_length=63206, examples=["This is the product description"])]
     image: Optional[Annotated[str, Field(min_length=1, max_length=100000, examples=["This is the product image content."])]]
     created_by_user_id: int
     created_at: datetime
     price : int
+    portion: bool = False
+    portions : x | Any 
 class ProductCreate(ProductBase):
     model_config = ConfigDict(extra="forbid")
 
@@ -32,6 +38,8 @@ class ProductCreateInternal(ProductCreate):
     category_id : int
     description : str | None = None
     stock_available : bool = True
+    portion : bool = False
+    
 class ProductUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -58,3 +66,21 @@ class ProductDelete(BaseModel):
 
     is_deleted: bool
     deleted_at: datetime
+
+
+class ProductPortionBase(BaseModel):
+    name: str
+    price: int
+    stock_available: bool
+
+class ProductPortionCreate(ProductPortionBase):
+    product_id: int
+    
+
+class ProductPortionUpdate(ProductPortionBase):
+    pass
+
+class ProductPortionRead(ProductPortionBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime]

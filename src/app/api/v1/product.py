@@ -1,3 +1,4 @@
+import json
 from typing import Annotated, Any, List
 
 from fastapi import APIRouter, Depends, Request, status
@@ -10,12 +11,12 @@ from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import ForbiddenException, NotFoundException
 from ...core.utils.cache import cache
 from ...core.schemas import ResponseSchema
-from ...crud.crud_products import crud_product
+from ...crud.crud_products import crud_product, crud_product_portion
 from ...crud.crud_category import crud_category
 from ...crud.crud_users import crud_users
 from ...schemas.post import PostCreate, PostCreateInternal, PostRead, PostUpdate
 from ...schemas.category import CategoryCreate, CategoryCreateInternal, CategoryRead, CategoryUpdate
-from ...schemas.product import ProductRead, ProductCreate, ProductCreateInternal, ProductUpdateInternal, ProductUpdate
+from ...schemas.product import ProductRead, ProductCreate, ProductCreateInternal, ProductUpdateInternal, ProductPortionCreate
 from ...schemas.user import UserRead
 from ...service.external.s3_bucket import S3Utils
 
@@ -51,7 +52,7 @@ async def get_product(
     if current_user is None:
         raise NotFoundException("User not found")
 
-    product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id)
+    product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id,schema_to_select=ProductRead)
     if not product:
         raise NotFoundException("Product not found")
     return ResponseSchema(
@@ -76,8 +77,9 @@ async def write_product(
     image = form_data.get('image')
     product_internal_dict['name'] = form_data.get('name')
     product_internal_dict['stock_available'] = form_data.get('stock_available')
-    product_internal_dict['price'] = form_data.get('price')
-    category_id = int(form_data.get('category_id'))
+    product_internal_dict['price'] = form_data.get('price',0)
+    product_internal_dict['portion'] = form_data.get('portion')
+    category_id = int(form_data.get('category_id',1))
     category = await crud_category.get(db=db, id=category_id, created_by_user_id=current_user["id"])
     if category is None:
         raise NotFoundException("Category not found")
@@ -90,10 +92,25 @@ async def write_product(
         product_internal_dict["image"] = image_url
     product_internal = ProductCreateInternal(**product_internal_dict)
     created_product: ProductRead = await crud_product.create(db=db, object=product_internal)
+    if created_product.portion:
+        portions = form_data.get('portions')
+        portions_list = json.loads(portions)  # Parse JSON string into a list of dictionaries
+
+        for portion in portions_list:
+            print('=====================',portion,"=============")
+            portion_object = ProductPortionCreate(
+                name=portion["name"],
+                price=portion["price"],
+                stock_available=portion["stock_available"],
+                product_id = created_product.id
+            )
+            await crud_product_portion.create(db=db, object=portion_object)
+    product: ProductRead = await crud_product.get(db=db,id= created_product.id, schema_to_select=ProductRead)
+    product["portions"]=await crud_product_portion.get(db=db, product_id= product["id"])
     return ResponseSchema(
         status_code= status.HTTP_201_CREATED,
         message="Product successfully created",
-        data=created_product
+        data=product
     )
 
 
