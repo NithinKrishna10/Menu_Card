@@ -28,7 +28,7 @@ async def login_for_access_token(
 ) -> dict[str, str]:
     user = await authenticate_user(username_or_email=form_data.username, password=form_data.password, db=db)
     if not user:
-        raise UnauthorizedException("Wrong username, email or password.")
+        raise UnauthorizedException("Invalid credentials")
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = await create_access_token(data={"sub": user["username"]}, expires_delta=access_token_expires)
@@ -40,7 +40,7 @@ async def login_for_access_token(
         key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="Lax", max_age=max_age
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token,"refresh_token": refresh_token, "token_type": "bearer"}
 
 
 @router.post("/refresh")
