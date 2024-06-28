@@ -3,6 +3,8 @@ from typing import Annotated, Any, List
 from fastapi import APIRouter, Depends, Request, status
 from fastcrud.paginated import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
+from asyncpg.exceptions import ForeignKeyViolationError
+from sqlalchemy.exc import IntegrityError
 
 
 from ...api.dependencies import get_current_superuser, get_current_user
@@ -118,8 +120,8 @@ async def update_category(
     s3_object = S3Utils()
     if image:
         image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}{category['name']}", file=image)
-        category_update_dict["image_url"] = image_url
-        s3_object.delete_image_from_s3(file_url=category["image_url"])
+        category_update_dict["image"] = image_url
+        s3_object.delete_image_from_s3(file_url=category["image"])
 
     await crud_category.update(db=db, object=category_update_dict, id=category["id"])
     updated_category = await crud_category.get(db=db, id=category["id"])
@@ -144,9 +146,19 @@ async def delete_category(
     if not category:
         raise NotFoundException("Category not found")
 
-    await crud_category.db_delete(db=db, id=category_id)
-    return ResponseSchema(
-    status_code= status.HTTP_204_NO_CONTENT,
-    message="Category successfully deleted",
-    data={}
-)
+
+
+    try:
+        await crud_category.db_delete(db=db, id=category_id)
+        return ResponseSchema(
+            status_code=status.HTTP_204_NO_CONTENT,
+            message="Category successfully deleted",
+            data={}
+        )
+    except IntegrityError as e:
+        return ResponseSchema(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Cannot delete category. Delete all products under this category first.",
+            data={}
+        )
+    
