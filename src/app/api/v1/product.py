@@ -19,6 +19,8 @@ from ...schemas.category import CategoryCreate, CategoryCreateInternal, Category
 from ...schemas.product import ProductRead, ProductCreate, ProductCreateInternal, ProductUpdateInternal, ProductPortionCreate
 from ...schemas.user import UserRead
 from ...service.external.s3_bucket import S3Utils
+from ...models.product import ProductPortion, Product
+
 
 router = APIRouter(prefix="/user", tags=["users products"])
 
@@ -32,7 +34,19 @@ async def get_product(
     if current_user is None:
         raise NotFoundException("User not found")
 
-    product = await crud_product.get_multi(db=db, created_by_user_id=current_user["id"])
+    # product = await crud_product.get_multi_joined(db=db, created_by_user_id=current_user["id"],join_model=ProductPortion,join_on=ProductPortion.product_id==Product.id)
+    # join_condition = (  == )
+    join_condition = ProductPortion.product_id == Product.id
+    # Perform the joined query
+    product = await crud_product.get_multi_joined(
+        db=db,
+        join_on=ProductPortion.product_id == Product.id,
+        join_model=ProductPortion,
+        join_schema_to_select=ProductRead,
+        nest_joins = True,
+        relationship_type='one-to-many',
+        created_by_user_id=current_user["id"],
+    )
     if not product:
         raise NotFoundException("Product not found")
     return ResponseSchema(
@@ -52,7 +66,17 @@ async def get_product(
     if current_user is None:
         raise NotFoundException("User not found")
 
-    product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id,schema_to_select=ProductRead)
+    # product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id,schema_to_select=ProductRead)
+    product = await crud_product.get_multi_joined(
+        db=db,
+        join_on=ProductPortion.product_id == Product.id,
+        join_model=ProductPortion,
+        join_schema_to_select=ProductRead,
+        nest_joins = True,
+        relationship_type='one-to-many',
+        # created_by_user_id=current_user["id"],
+        id=product_id
+    )
     if not product:
         raise NotFoundException("Product not found")
     return ResponseSchema(
@@ -106,7 +130,7 @@ async def write_product(
             )
             await crud_product_portion.create(db=db, object=portion_object)
     product: ProductRead = await crud_product.get(db=db,id= created_product.id, schema_to_select=ProductRead)
-    product["portions"]=await crud_product_portion.get(db=db, product_id= product["id"])
+    product["portions"]=await crud_product_portion.get_multi(db=db, product_id= product["id"])
     return ResponseSchema(
         status_code= status.HTTP_201_CREATED,
         message="Product successfully created",
@@ -186,3 +210,31 @@ async def delete_product(
     message="Product successfully deleted",
     data={}
 )
+
+
+
+@router.get("/productportion/{product_portion_id}", response_model=ProductPortion)
+def read_product_portion(product_portion_id: int, db: AsyncSession = Depends(async_get_db)):
+    db_product_portion =crud_product_portion.get(db=db, id=product_portion_id)
+    if db_product_portion is None:
+        raise NotFoundException("Product portion not found")
+    return db_product_portion
+
+@router.put("/productportion/{product_portion_id}", response_model=ProductPortion)
+def update_product_portion(product_portion_id: int, product_portion: dict, db: AsyncSession = Depends(async_get_db)):
+    db_product_portion =crud_product_portion.update(db=db, id=product_portion_id, obj_in=product_portion)
+    if db_product_portion is None:
+        raise NotFoundException("Product portion not found")
+    return db_product_portion
+
+@router.delete("/productportion/{product_portion_id}", response_model=ProductPortion)
+def delete_product_portion(product_portion_id: int, db: AsyncSession = Depends(async_get_db)):
+    db_product_portion =crud_product_portion.delete(db=db, id=product_portion_id)
+    if db_product_portion is None:
+        raise NotFoundException("Product portion not found")
+    return db_product_portion
+
+@router.get("/productportions/", response_model=list[ProductPortion])
+def read_product_portions(skip: int = 0, limit: int = 10, db: AsyncSession = Depends(async_get_db)):
+    product_portions =crud_product_portion.get_multi(db=db, skip=skip, limit=limit)
+    return product_portions

@@ -26,7 +26,7 @@ class ProductRead(BaseModel):
     created_at: datetime
     price : int
     portion: bool = False
-    portions : x | Any 
+    portions : Any
 class ProductCreate(ProductBase):
     model_config = ConfigDict(extra="forbid")
 
