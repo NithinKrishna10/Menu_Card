@@ -16,7 +16,7 @@ from ...crud.crud_category import crud_category
 from ...crud.crud_users import crud_users
 from ...schemas.post import PostCreate, PostCreateInternal, PostRead, PostUpdate
 from ...schemas.category import CategoryCreate, CategoryCreateInternal, CategoryRead, CategoryUpdate
-from ...schemas.product import ProductRead, ProductCreate, ProductCreateInternal, ProductUpdateInternal, ProductPortionCreate
+from ...schemas.product import ProductRead, ProductCreate, ProductCreateInternal, ProductUpdateInternal, ProductPortionCreate, ProductPortionUpdate, ProductPortionCreateInternal
 from ...schemas.user import UserRead
 from ...service.external.s3_bucket import S3Utils
 from ...models.product import ProductPortion, Product
@@ -67,14 +67,14 @@ async def get_product(
         raise NotFoundException("User not found")
 
     # product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id,schema_to_select=ProductRead)
-    product = await crud_product.get_multi_joined(
+    product = await crud_product.get_joined(
         db=db,
         join_on=ProductPortion.product_id == Product.id,
         join_model=ProductPortion,
         join_schema_to_select=ProductRead,
-        nest_joins = True,
+        nest_joins=True,
         relationship_type='one-to-many',
-        # created_by_user_id=current_user["id"],
+        created_by_user_id=current_user["id"],
         id=product_id
     )
     if not product:
@@ -121,7 +121,6 @@ async def write_product(
         portions_list = json.loads(portions)  # Parse JSON string into a list of dictionaries
 
         for portion in portions_list:
-            print('=====================',portion,"=============")
             portion_object = ProductPortionCreate(
                 name=portion["name"],
                 price=portion["price"],
@@ -213,28 +212,81 @@ async def delete_product(
 
 
 
-@router.get("/productportion/{product_portion_id}", response_model=ProductPortion)
-def read_product_portion(product_portion_id: int, db: AsyncSession = Depends(async_get_db)):
-    db_product_portion =crud_product_portion.get(db=db, id=product_portion_id)
+@router.get("/productportion/{product_portion_id}", response_model=ResponseSchema)
+def read_product_portion(product_portion_id: int, current_user: Annotated[UserRead, Depends(get_current_user)], db: AsyncSession = Depends(async_get_db)):
+    db_product_portion = crud_product_portion.get(db=db, id=product_portion_id)
     if db_product_portion is None:
         raise NotFoundException("Product portion not found")
-    return db_product_portion
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Product Portion successfully deleted",
+        data=db_product_portion
+    )
 
-@router.put("/productportion/{product_portion_id}", response_model=ProductPortion)
-def update_product_portion(product_portion_id: int, product_portion: dict, db: AsyncSession = Depends(async_get_db)):
-    db_product_portion =crud_product_portion.update(db=db, id=product_portion_id, obj_in=product_portion)
-    if db_product_portion is None:
-        raise NotFoundException("Product portion not found")
-    return db_product_portion
 
-@router.delete("/productportion/{product_portion_id}", response_model=ProductPortion)
-def delete_product_portion(product_portion_id: int, db: AsyncSession = Depends(async_get_db)):
-    db_product_portion =crud_product_portion.delete(db=db, id=product_portion_id)
+@router.post("/productportion/{product_id}", response_model=ProductPortion)
+async def write_product_portion(product_portion_id: int, product_portion: ProductPortionCreate, current_user: Annotated[UserRead, Depends(get_current_user)], db: AsyncSession = Depends(async_get_db)):
+    db_product = crud_product.get(db=db, id=product_portion_id, created_by_user_id=current_user["id"])
+    if db_product is None:
+        raise NotFoundException("Product not found")
+    
+    obj_in = ProductPortionCreateInternal(
+        name=product_portion.name,
+        stock_available=product_portion.stock_available,
+        price=product_portion.price,
+        product_id=db_product["id"]
+    )
+    db_product_portion = await crud_product_portion.create(db=db, object=product_portion)
     if db_product_portion is None:
         raise NotFoundException("Product portion not found")
-    return db_product_portion
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Product Portion successfully updated",
+        data=db_product_portion
+    )
+
+@router.patch("/productportion/{product_portion_id}", response_model=ResponseSchema)
+async def update_product_portion(product_portion_id: int, product_portion: ProductPortionUpdate, current_user: Annotated[UserRead, Depends(get_current_user)], db: AsyncSession = Depends(async_get_db)):
+    db_product_portion = await crud_product_portion.get(db=db, id=product_portion_id)
+    product_portion = product_portion.model_dump()
+    product_portion = {k: v for k,v in product_portion.items() if v is not None}
+    if db_product_portion is None:
+        raise NotFoundException("Product portion not found")
+    await crud_product_portion.update(db=db, object=product_portion, id=product_portion_id)
+    db_product_portion = await crud_product_portion.get(db=db, id=product_portion_id)
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Product Portion successfully updated",
+        data=db_product_portion     
+    )
+
+
+@router.delete("/productportion/{product_portion_id}", response_model=ResponseSchema)
+async def delete_product_portion(product_portion_id: int, current_user: Annotated[UserRead, Depends(get_current_user)], db: AsyncSession = Depends(async_get_db)):
+    db_product_portion = await crud_product_portion.get(db=db, id=product_portion_id)
+    db_product_portions = await crud_product_portion.get_multi(db=db, id=db_product_portion["id"])
+    
+    if len(db_product_portions) >2:
+        db_product_portion = await crud_product_portion.delete(db=db, id=product_portion_id)
+    else:
+        for portions in db_product_portions:
+            await crud_product_portion.delete(db=db, id=portions["id"])
+            
+        
+    
+    if db_product_portion is None:
+        raise NotFoundException("Product portion not found")
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Product Portion successfully deleted",
+        data=db_product_portion
+    )
 
 @router.get("/productportions/", response_model=list[ProductPortion])
-def read_product_portions(skip: int = 0, limit: int = 10, db: AsyncSession = Depends(async_get_db)):
-    product_portions =crud_product_portion.get_multi(db=db, skip=skip, limit=limit)
-    return product_portions
+async def read_product_portions( current_user: Annotated[UserRead, Depends(get_current_user)], db: AsyncSession = Depends(async_get_db)):
+    product_portions = await crud_product_portion.get_multi(db=db)
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Product Portion successfully fetched",
+        data=product_portions
+    )

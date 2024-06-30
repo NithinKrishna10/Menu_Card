@@ -1,5 +1,6 @@
 from typing import Annotated, Any, List
 
+from CRUDFastAPI import JoinConfig
 from fastapi import APIRouter, Depends, Request, status
 from fastcrud.paginated import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,9 +15,12 @@ from ...crud.crud_posts import crud_posts
 from ...crud.crud_category import crud_category
 from ...crud.crud_products import crud_product
 from ...crud.crud_users import crud_users
+from ...models.product import Product, ProductPortion
+from ...models.category import Category
 from ...schemas.post import PostCreate, PostCreateInternal, PostRead, PostUpdate
 from ...schemas.category import CategoryCreate, CategoryCreateInternal, CategoryRead, CategoryUpdate
 from ...schemas.user import UserRead
+from ...schemas.product import ProductRead
 from ...service.external.s3_bucket import S3Utils
 
 router = APIRouter(tags=["Menu Card"])
@@ -75,11 +79,29 @@ async def get_product(
     if current_user is None:
         raise NotFoundException("User not found")
     if category_id:
-        product = await crud_product.get_multi(db=db, created_by_user_id=current_user["id"],category_id=category_id)
+        product = await crud_product.get_multi_joined(
+            db=db,
+            nest_joins = True,
+            join_on=ProductPortion.product_id == Product.id,
+            join_model=ProductPortion,
+            created_by_user_id=current_user["id"],
+            category_id=category_id
+            # id=product_id
+        )
     else:
-        product = await crud_product.get_multi(db=db, created_by_user_id=current_user["id"])
+        product = await crud_product.get_multi_joined(  
+            db=db,
+            join_on=ProductPortion.product_id == Product.id,
+            join_model=ProductPortion,
+            nest_joins = True,
+            relationship_type='one-to-many',
+            created_by_user_id=current_user["id"],
+   
+        )
     if not product:
         raise NotFoundException("Product not found")
+    for pro in product["data"]:
+        pro["category"] = await crud_category.get(db=db, id=pro["category_id"])
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
         message="Product successfully fetched",
@@ -97,11 +119,50 @@ async def get_product(
     if current_user is None:
         raise NotFoundException("User not found")
 
-    product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id)
+    # product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id)
+    product = await crud_product.get_joined(  
+            db=db,
+            join_on=ProductPortion.product_id == Product.id,
+            join_model=ProductPortion,
+            nest_joins = True,
+            relationship_type='one-to-many',
+            created_by_user_id=current_user["id"],
+            id=product_id
+    )
+    
     if not product:
         raise NotFoundException("Product not found")
+    product["category"] = await crud_category.get(db=db, id=product["category_id"])
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
         message="Product successfully fetched",
         data=product
     )
+    
+
+
+
+
+
+
+         #      joins_config=[
+            #         JoinConfig(
+            #             model=ProductPortion,
+            #             join_on=ProductPortion.product_id == Product.id,
+            #             relationship_type='one-to-many',
+            # # nest_joins = True,
+            #             join_prefix="portions_",
+            #             # schema_to_select=TierSchema,
+            #             join_type="left",
+            #         ),
+            #         JoinConfig(
+            #             model=Category,
+            #             join_on=Category.id == Product.category_id,
+            #             relationship_type='one-to-one',
+            #             # nest_joins = True,
+            #             # join_prefix="dept_",
+            #             # schema_to_select=DepartmentSchema,
+            #             # join_type="inner",
+            #         )
+            #     ],
+            # id=product_id

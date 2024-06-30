@@ -23,6 +23,7 @@ class ProductRead(BaseModel):
     description: Annotated[str, Field(min_length=1, max_length=63206, examples=["This is the product description"])]
     image: Optional[Annotated[str, Field(min_length=1, max_length=100000, examples=["This is the product image content."])]]
     created_by_user_id: int
+    stock_available : bool
     created_at: datetime
     price : int
     portion: bool = False
@@ -74,11 +75,16 @@ class ProductPortionBase(BaseModel):
     stock_available: bool
 
 class ProductPortionCreate(ProductPortionBase):
+    pass
+    
+class ProductPortionCreateInternal(ProductPortionBase):
     product_id: int
     
 
 class ProductPortionUpdate(ProductPortionBase):
-    pass
+    name: str = None 
+    price: int = None
+    stock_available: bool = None
 
 class ProductPortionRead(ProductPortionBase):
     id: int
