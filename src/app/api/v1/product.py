@@ -121,7 +121,7 @@ async def write_product(
         portions_list = json.loads(portions)  # Parse JSON string into a list of dictionaries
 
         for portion in portions_list:
-            portion_object = ProductPortionCreate(
+            portion_object = ProductPortionCreateInternal(
                 name=portion["name"],
                 price=portion["price"],
                 stock_available=portion["stock_available"],
