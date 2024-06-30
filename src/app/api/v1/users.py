@@ -53,7 +53,7 @@ async def write_user(
 
     user_internal = UserCreateInternal(**user_internal_dict)
     created_user: UserRead = await crud_users.create(db=db, object=user_internal)
-    qr_code = generate_qr_code(url=f"https://menucard.site/users/index/{created_user.uuid}")
+    qr_code = generate_qr_code(name=created_user.uuid, url=f"https://menucard.site/users/index/{created_user.uuid}")
     await crud_users.update(db=db,object={'qr_code' : qr_code}, id = created_user.id)
     created_user.qr_code = qr_code
     return ResponseSchema(

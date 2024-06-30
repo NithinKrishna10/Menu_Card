@@ -3,7 +3,7 @@ from io import BytesIO
 from PIL import Image
 from ..external.s3_bucket import S3Utils
 
-def generate_qr_code(url: str) -> BytesIO:
+def generate_qr_code(name: str, url: str) -> BytesIO:
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -18,8 +18,8 @@ def generate_qr_code(url: str) -> BytesIO:
     img = img.convert("RGB")
     
     buffer = BytesIO()
-    img.save(buffer, format="PNG")
+    img.save("qr-code.png")
     buffer.seek(0)
     s3_object = S3Utils() 
 
-    return s3_object.upload_qr_image_to_s3(name="qr-code", file=buffer)
+    return s3_object.upload_qr_image_to_s3(name=name, file=buffer)
