@@ -4,6 +4,7 @@ from typing import Annotated, Any, List
 from fastapi import APIRouter, Depends, Request, status
 from fastcrud.paginated import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 
 from ...api.dependencies import get_current_superuser, get_current_user
@@ -35,25 +36,35 @@ async def get_product(
         raise NotFoundException("User not found")
 
     # product = await crud_product.get_multi_joined(db=db, created_by_user_id=current_user["id"],join_model=ProductPortion,join_on=ProductPortion.product_id==Product.id)
-    # join_condition = (  == )
-    join_condition = ProductPortion.product_id == Product.id
     # Perform the joined query
-    product = await crud_product.get_multi_joined(
-        db=db,
-        join_on=ProductPortion.product_id == Product.id,
-        join_model=ProductPortion,
-        join_schema_to_select=ProductRead,
-        nest_joins = True,
-        relationship_type='one-to-many',
-        created_by_user_id=current_user["id"],
-    )
+    # product = await crud_product.get_multi_joined(
+    #     db=db,
+    #     join_on=ProductPortion.product_id == Product.id,
+    #     join_model=ProductPortion,
+    #     join_schema_to_select=ProductRead,
+    #     nest_joins = True,
+    #     relationship_type='one-to-many',
+    #     created_by_user_id=current_user["id"],
+    # )
+    stmt = (
+        select("*")
+        .where(Product.created_by_user_id == current_user["id"])
+        )
+    result = await db.execute(stmt)
+        # result = result.scalars().all()
+    product = [dict(row) for row in result.mappings()]
+    for pro in product:
+        pro["category"] = await crud_category.get(db=db, id=pro["category_id"])
+        pro["product_portion"] = (await crud_product_portion.get_multi(db=db, product_id=pro["id"]))["data"]
+    
     if not product:
         raise NotFoundException("Product not found")
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
         message="Product successfully fetched",
-        data=product["data"]
+        data=product
     )
+
 
 
 @router.get("/product/{product_id}", response_model=ResponseSchema)
@@ -182,21 +193,22 @@ async def update_product(
     updated_product = await crud_product.get(db=db, id=product_id)
     
     portions = form_data.get('portions')
-    portions_list = json.loads(portions) 
+    print(portions)
+    if portions:
+        portions_list = json.loads(portions) 
 
-    for portion in portions_list:
-        
-        p_t = await crud_product_portion.get(db=db, product_id=product_id, name=portion["name"])
-        if p_t:
-            await crud_product_portion.update(db=db, object={"price":p_t["price"]}, id=p_t["id"])
-        else:      
-            portion_object = ProductPortionCreateInternal(
-                name=portion["name"],
-                price=portion["price"],
-                stock_available=portion["stock_available"],
-                product_id = product_id
-            )
-            await crud_product_portion.create(db=db, object=portion_object)
+        for portion in portions_list:
+            p_t = await crud_product_portion.get(db=db, product_id=product_id, name=portion["name"])
+            if p_t:
+                await crud_product_portion.update(db=db, object={"price":portion["price"]}, id=p_t["id"])
+            else:      
+                portion_object = ProductPortionCreateInternal(
+                    name=portion["name"],
+                    price=portion["price"],
+                    stock_available=portion["stock_available"],
+                    product_id = product_id
+                )
+                await crud_product_portion.create(db=db, object=portion_object)
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
         message="Product successfully updated",
@@ -216,6 +228,11 @@ async def delete_product(
     product = await crud_product.get(db=db, id=product_id)
     if not product:
         raise NotFoundException("Product not found")
+    db_product_portions = await crud_product_portion.get_multi(db=db, product_id=product["id"])
+
+    for portions in db_product_portions["data"]:
+        print(portions)
+        await crud_product_portion.delete(db=db, id=portions["id"])
 
     await crud_product.db_delete(db=db, id=product_id)
     
@@ -269,6 +286,11 @@ async def update_product_portion(product_portion_id: int, product_portion: Produ
         raise NotFoundException("Product portion not found")
     await crud_product_portion.update(db=db, object=product_portion, id=product_portion_id)
     db_product_portion = await crud_product_portion.get(db=db, id=product_portion_id)
+
+    print(f"----{db_product_portion['name']}----")
+    if db_product_portion["name"] == "Full":
+        print("--------")
+        await crud_product.update(db=db, object={"price" : product_portion["price"]}, id=db_product_portion["product_id"])
     return ResponseSchema(
         status_code=status.HTTP_200_OK,
         message="Product Portion successfully updated",

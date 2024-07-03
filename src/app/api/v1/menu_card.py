@@ -13,7 +13,7 @@ from ...core.utils.cache import cache
 from ...core.schemas import ResponseSchema
 from ...crud.crud_posts import crud_posts
 from ...crud.crud_category import crud_category
-from ...crud.crud_products import crud_product
+from ...crud.crud_products import crud_product, crud_product_portion
 from ...crud.crud_users import crud_users
 from ...models.product import Product, ProductPortion
 from ...models.category import Category
@@ -68,6 +68,9 @@ async def get_category(
 
 
 
+from sqlalchemy.future import select
+
+
 @router.get("/product", response_model=ResponseSchema)
 async def get_product(
     user_id: str,
@@ -79,33 +82,41 @@ async def get_product(
     if current_user is None:
         raise NotFoundException("User not found")
     if category_id:
-        product = await crud_product.get_multi_joined(
-            db=db,
-            nest_joins = True,
-            join_on=ProductPortion.product_id == Product.id,
-            join_model=ProductPortion,
-            created_by_user_id=current_user["id"],
-            category_id=category_id
-            # id=product_id
+ 
+        stmt = (
+        select("*")
+        .where(Product.created_by_user_id == current_user["id"],Product.category_id == category_id)
         )
+        result = await db.execute(stmt)
+        product = [dict(row) for row in result.mappings()]
     else:
-        product = await crud_product.get_multi_joined(  
-            db=db,
-            join_on=ProductPortion.product_id == Product.id,
-            join_model=ProductPortion,
-            nest_joins = True,
-            relationship_type='one-to-many',
-            created_by_user_id=current_user["id"],
-   
+        # product = await crud_product.get_multi(  
+        #     db=db,
+        #     # join_on=ProductPortion.product_id == Product.id,
+        #     # join_model=ProductPortion,
+        #     # nest_joins = True,
+        #     # join_prefix="portion_",
+        #     # relationship_type='one-to-many',
+        #     created_by_user_id=current_user["id"], 
+        # )
+        
+        stmt = (
+        select("*")
+        .where(Product.created_by_user_id == current_user["id"])
         )
+        result = await db.execute(stmt)
+        # result = result.scalars().all()
+        product = [dict(row) for row in result.mappings()]
+
     if not product:
         raise NotFoundException("Product not found")
-    for pro in product["data"]:
+    for pro in product:
         pro["category"] = await crud_category.get(db=db, id=pro["category_id"])
+        pro["product_portion"] = (await crud_product_portion.get_multi(db=db, product_id=pro["id"]))["data"]
     return ResponseSchema(
         status_code= status.HTTP_200_OK,
         message="Product successfully fetched",
-        data=product["data"]
+        data=product
     )
 
 
