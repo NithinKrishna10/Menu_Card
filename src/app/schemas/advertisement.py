@@ -9,7 +9,8 @@ from ..core.schemas import PersistentDeletion, TimestampSchema, UUIDSchema
 
 class AdvertisementBase(BaseModel):
     name: Annotated[str, Field(min_length=2, max_length=30, examples=["This is my post"])]
-    description: Annotated[str, Field(min_length=1, max_length=63206, examples=["This is the content of my post."])]
+    # description: Annotated[str, Field(min_length=1, max_length=63206, examples=["This is the content of my post."])]
+    position : int
 
 class Advertisement(TimestampSchema, AdvertisementBase, PersistentDeletion):
     image: Annotated[str, Field(min_length=1, max_length=63206, examples=["This is the content of my post."])]

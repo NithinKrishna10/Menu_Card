@@ -67,25 +67,25 @@ async def write_advertisement(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> ResponseSchema:
     
-    # if current_user is None:
-    #     raise NotFoundException("User not found")
+    if current_user is None:
+        raise NotFoundException("User not found")
 
     advertisement_internal_dict = {}
     form_data = await request.form()
-    images = form_data.get('images')
+    image = form_data.get('image')
     advertisement_internal_dict['name'] = form_data.get('name','advertisement')
+    advertisement_internal_dict['position'] = form_data.get('position',)
     advertisement_internal_dict["created_by_user_id"] = current_user["id"]
 
     s3_object = S3Utils()
     advertisements = []
-    print(images,type(images))
-    if images:
-        for image in images:
-            image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}-{advertisement_internal_dict['name']}", file=image)
-            advertisement_internal_dict["image"] = image_url
-            advertisement_internal = AdvertisementCreateInternal(**advertisement_internal_dict)
-            created_advertisement: AdvertisementRead = await crud_advertisement.create(db=db, object=advertisement_internal)
-            advertisements.append(created_advertisement)
+    print(image,type(image))
+    if image:
+        image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}-{advertisement_internal_dict['name']}", file=image)
+        advertisement_internal_dict["image"] = image_url
+        advertisement_internal = AdvertisementCreateInternal(**advertisement_internal_dict)
+        created_advertisement: AdvertisementRead = await crud_advertisement.create(db=db, object=advertisement_internal)
+        advertisements.append(created_advertisement)
     return ResponseSchema(
         status_code= status.HTTP_201_CREATED,
         message="Advertisement successfully created",
