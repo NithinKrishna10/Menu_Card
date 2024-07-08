@@ -29,37 +29,37 @@ async def write_user(
     form_data = await request.form()
     image = form_data.get('image')
     user_internal_dict['name'] = form_data.get('name')
-    user_internal_dict['username'] = form_data.get('username')
-    user_internal_dict['email'] = form_data.get('email')
-    user_internal_dict['password'] = form_data.get('password')
-    user_internal_dict['phone'] = form_data.get('phone')
-    user_internal_dict['location'] = form_data.get('location')
+    # user_internal_dict['username'] = form_data.get('username')
+    # user_internal_dict['email'] = form_data.get('email')
+    # user_internal_dict['password'] = form_data.get('password')
+    # user_internal_dict['phone'] = form_data.get('phone')
+    # user_internal_dict['location'] = form_data.get('location')
     
-    email_row = await crud_users.exists(db=db, email=user_internal_dict['email'])
-    if email_row:
-        raise DuplicateValueException("Email is already registered")
+    # email_row = await crud_users.exists(db=db, email=user_internal_dict['email'])
+    # if email_row:
+    #     raise DuplicateValueException("Email is already registered")
 
-    username_row = await crud_users.exists(db=db, username=user_internal_dict['username'])
-    if username_row:
-        raise DuplicateValueException("Username not available")
+    # username_row = await crud_users.exists(db=db, username=user_internal_dict['username'])
+    # if username_row:
+    #     raise DuplicateValueException("Username not available")
     s3_object = S3Utils() 
 
     if image:
         image_url = s3_object.upload_image_to_s3(name=user_internal_dict['name'], file=image)
  
-        user_internal_dict["image_url"] = image_url    
-    user_internal_dict["hashed_password"] = get_password_hash(password=user_internal_dict["password"])
-    del user_internal_dict["password"]
+    #     user_internal_dict["image_url"] = image_url    
+    # user_internal_dict["hashed_password"] = get_password_hash(password=user_internal_dict["password"])
+    # del user_internal_dict["password"]
 
-    user_internal = UserCreateInternal(**user_internal_dict)
-    created_user: UserRead = await crud_users.create(db=db, object=user_internal)
-    qr_code = generate_qr_code(name=created_user.uuid, url=f"https://menucard.site/users/index/{created_user.uuid}")
-    await crud_users.update(db=db,object={'qr_code' : qr_code}, id = created_user.id)
-    created_user.qr_code = qr_code
+    # user_internal = UserCreateInternal(**user_internal_dict)
+    # created_user: UserRead = await crud_users.create(db=db, object=user_internal)
+    # qr_code = generate_qr_code(name="yamama", url=f"https://menucard.site/users/index/695b2be4-c10b-41c0-8cea-1888c83db4e2")
+    # await crud_users.update(db=db,object={'qr_code' : qr_code}, id = created_user.id)
+    # created_user.qr_code = qr_code
     return ResponseSchema(
         status_code=status.HTTP_201_CREATED,
         message="user created",
-        data=created_user
+        data=image_url
         
     )
 

@@ -18,7 +18,7 @@ def generate_qr_code(name: str, url: str) -> BytesIO:
     img = img.convert("RGB")
     
     buffer = BytesIO()
-    img.save("qr-code.png")
+    img.save(buffer, format="PNG")
     buffer.seek(0)
     s3_object = S3Utils() 
 

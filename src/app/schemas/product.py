@@ -81,6 +81,7 @@ class ProductUpdateInternal(BaseModel):
     name: str | None = None
     price: int | None = None
     stock_available: bool | None = None
+    portion : bool | None = None
 
 
 class ProductDelete(BaseModel):

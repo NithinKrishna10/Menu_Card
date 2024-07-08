@@ -28,7 +28,7 @@ async def get_categories(
     if current_user is None:
         raise NotFoundException("User not found")
 
-    advertisement = await crud_advertisement.get_multi(db=db, created_by_user_id=current_user["id"])
+    advertisement = await crud_advertisement.get_multi(db=db, created_by_user_id=current_user["id"], sort_columns='position', sort_orders='asc')
     if not advertisement:
         raise NotFoundException(detail="Advertisement not found")
 
@@ -81,7 +81,7 @@ async def write_advertisement(
     advertisements = []
     print(image,type(image))
     if image:
-        image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}-{advertisement_internal_dict['name']}", file=image)
+        image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}-{advertisement_internal_dict['name']}-{advertisement_internal_dict['position'] }", file=image)
         advertisement_internal_dict["image"] = image_url
         advertisement_internal = AdvertisementCreateInternal(**advertisement_internal_dict)
         created_advertisement: AdvertisementRead = await crud_advertisement.create(db=db, object=advertisement_internal)
@@ -89,7 +89,7 @@ async def write_advertisement(
     return ResponseSchema(
         status_code= status.HTTP_201_CREATED,
         message="Advertisement successfully created",
-        data=advertisements
+        data=created_advertisement
     )
 
 @router.patch("/advertisement/{advertisement_id}", response_model=ResponseSchema)
@@ -102,13 +102,14 @@ async def update_advertisement(
 
     if current_user is None:
         raise NotFoundException("User not found")
-    advertisement = await crud_advertisement.get(db=db, id=advertisement_id)
+    advertisement = await crud_advertisement.get(db=db, id=advertisement_id, created_by_user_id=current_user["id"],)
     if not advertisement:
         raise NotFoundException("Advertisement not found")
     advertisement_update_dict = {}
     form_data = await request.form()
     image = form_data.get('image')
-    advertisement_update_dict['name'] = form_data.get('name', 'advertisement')
+    advertisement_update_dict['name'] = form_data.get('name')
+    advertisement_update_dict['postion'] = form_data.get('postion')
 
     # Filter out keys with None values
     advertisement_update_dict = {k: v for k, v in advertisement_update_dict.items() if v is not None}
@@ -117,8 +118,8 @@ async def update_advertisement(
     s3_object = S3Utils()
     if image:
         image_url = s3_object.upload_image_to_s3(name=f"{current_user['uuid']}{advertisement['name']}", file=image)
-        advertisement_update_dict["image_url"] = image_url
-        s3_object.delete_image_from_s3(file_url=advertisement["image_url"])
+        advertisement_update_dict["image"] = image_url
+        s3_object.delete_image_from_s3(file_url=advertisement["image"])
 
     await crud_advertisement.update(db=db, object=advertisement_update_dict, id=advertisement["id"])
     updated_advertisement = await crud_advertisement.get(db=db, id=advertisement["id"])

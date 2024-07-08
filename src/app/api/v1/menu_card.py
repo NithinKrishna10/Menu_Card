@@ -15,6 +15,7 @@ from ...crud.crud_posts import crud_posts
 from ...crud.crud_category import crud_category
 from ...crud.crud_products import crud_product, crud_product_portion
 from ...crud.crud_users import crud_users
+from ...crud.crud_advertisement import crud_advertisement
 from ...models.product import Product, ProductPortion
 from ...models.category import Category
 from ...schemas.post import PostCreate, PostCreateInternal, PostRead, PostUpdate
@@ -153,8 +154,46 @@ async def get_product(
 
 
 
+@router.get("/advertisement", response_model=ResponseSchema)
+async def get_categories(
+    user_id: str,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ResponseSchema:
+    current_user = await crud_users.get(db=db, uuid = user_id)
+    if current_user is None:
+        raise NotFoundException("User not found")
+
+    advertisement = await crud_advertisement.get_multi(db=db, created_by_user_id=current_user["id"], sort_columns='position', sort_orders='asc')
+    if not advertisement:
+        raise NotFoundException(detail="Advertisement not found")
+
+    return ResponseSchema(
+        status_code= status.HTTP_200_OK,
+        message="Advertisement successfully fetched",
+        data=advertisement["data"]
+    )
 
 
+@router.get("/product/text/", response_model=ResponseSchema)
+async def get_product(
+    product_name: str,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ResponseSchema:
+
+
+    product = await crud_product.get_multi(db=db,  name=product_name)
+    
+    if not product:
+        raise NotFoundException("Product not found")
+    else:
+        for pro in product["data"]:
+            product["category"] = await crud_category.get(db=db, id=pro["category_id"])
+    # product["category"] = await crud_category.get(db=db, id=product["category_id"])
+    return ResponseSchema(
+        status_code= status.HTTP_200_OK,
+        message="Product successfully fetched",
+        data=product
+    )
 
          #      joins_config=[
             #         JoinConfig(

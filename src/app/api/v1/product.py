@@ -77,17 +77,19 @@ async def get_product(
     if current_user is None:
         raise NotFoundException("User not found")
 
-    # product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id,schema_to_select=ProductRead)
-    product = await crud_product.get_joined(
-        db=db,
-        join_on=ProductPortion.product_id == Product.id,
-        join_model=ProductPortion,
-        join_schema_to_select=ProductRead,
-        nest_joins=True,
-        relationship_type='one-to-many',
-        created_by_user_id=current_user["id"],
-        id=product_id
-    )
+    product = await crud_product.get(db=db, created_by_user_id=current_user["id"], id=product_id)
+    # product = await crud_product.get_joined(
+    #     db=db,
+    #     join_on=ProductPortion.product_id == Product.id,
+    #     join_model=ProductPortion,
+    #     join_schema_to_select=ProductRead,
+    #     nest_joins=True,
+    #     relationship_type='one-to-many',
+    #     created_by_user_id=current_user["id"],
+    #     id=product_id
+    # )
+    product["category"] = await crud_category.get(db=db, id=product["category_id"])
+    product["product_portion"] = (await crud_product_portion.get_multi(db=db, product_id=product["id"]))["data"]
     if not product:
         raise NotFoundException("Product not found")
     return ResponseSchema(
@@ -169,7 +171,9 @@ async def update_product(
     product_update_dict['name'] = form_data.get('name')
     product_update_dict['price'] = form_data.get('price')
     product_update_dict['stock_available'] = form_data.get('stock_available')
+    product_update_dict['portion'] = form_data.get('portion')
     product_update_dict['description'] = form_data.get('description')
+    print(product_update_dict)
     category_id = form_data.get('category_id')
     if category_id:
         category = await crud_category.get(db=db, id=int(category_id), created_by_user_id=current_user["id"])
