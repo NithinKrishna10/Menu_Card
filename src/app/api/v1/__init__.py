@@ -11,6 +11,7 @@ from .category import router as category_router
 from .product import router as product_router
 from .menu_card import router as menu_card_router
 from .advertisement import router as advertisement_router
+from .leads import router as leads_router
 
 router = APIRouter(prefix="/v1")
 router.include_router(login_router)
@@ -20,7 +21,7 @@ router.include_router(category_router)
 router.include_router(product_router)
 router.include_router(menu_card_router)
 router.include_router(advertisement_router)
-# router.include_router(posts_router)
+router.include_router(leads_router)
 # router.include_router(tasks_router)
 # router.include_router(tiers_router)
 # router.include_router(rate_limits_router)
